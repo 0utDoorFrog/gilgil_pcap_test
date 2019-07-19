@@ -4,8 +4,8 @@ CONFIG -= app_bundle
 CONFIG -= qt
 LIBS += -lpcap
 SOURCES += \
-    main.cpp \
-    print.cpp
+        main.cpp \
+        print.cpp
 
 HEADERS += \
     print.h

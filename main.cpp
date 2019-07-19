@@ -1,30 +1,54 @@
-#include <stdint.h>
 #include <pcap.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <stdint.h>
 #include "print.h"
+#include <stdlib.h>
 
+/*
 
-void usage()
+struct packetData
 {
+    // Ethernet
+
+    uint8_t dMac[5]; // 0
+    uint8_t sMac[5]; // 6
+
+    uint16_t type; // 12 // Ethernet Header -> IP Header
+
+    // IP
+
+    uint8_t headerLength; // 14
+    uint16_t packetTotalLength; //16
+    uint8_t protocol; // 23
+
+    uint8_t sIP[3];             // 26
+    uint8_t dIP[3];             // 30
+
+    // TCP
+
+    uint16_t sPort;             // 34
+    uint16_t dPort;             // 36
+
+    uint8_t data[9];            // 54
+};
+
+*/
+
+void usage() {
   printf("syntax: pcap_test <interface>\n");
   printf("sample: pcap_test wlan0\n");
 }
 
-int main(int argc, char* argv[]) // argc != 2 -> exit
-{
-  if (argc != 2)
-  {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
     usage();
     return -1;
   }
 
   char* dev = argv[1];
   char errbuf[PCAP_ERRBUF_SIZE];
-  pcap_t* handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf); // PROMISCUOUS == 1
-
-  if (handle == nullptr) // ERROR Handeling
-  {
+  pcap_t* handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+  if (handle == nullptr) {
     fprintf(stderr, "couldn't open device %s: %s\n", dev, errbuf);
     return -1;
   }
@@ -33,42 +57,80 @@ int main(int argc, char* argv[]) // argc != 2 -> exit
   {
     struct pcap_pkthdr* header;
     const u_char* packet;
-    int res = pcap_next_ex(handle, &header, &packet); // get data
+    int res = pcap_next_ex(handle, &header, &packet);
+    if (res == 0) continue;
+    if (res == -1 || res == -2) break;
 
-    if (res == 0) // SUCCESS
-        continue;
+    packetData  * packetdata = (packetData *)malloc(sizeof(packetData));
+    packetDataConstruct(packetdata,packet);
 
-    if (res == -1 || res == -2) // ERROR
-        break;
-
-    struct httpPacket httppacket;
-
-    httpPacketStructConstructor(&httppacket,packet);
-
-    if((httppacket.sPort == 80) || (httppacket.dPort == 80))
+    if((packetdata->sPort == 80) | (packetdata->dPort == 80)) // HTTP
     {
-      printf("HTTP Packet : \n");
+        printf("HTTP DETECTED : \n");
 
-      printMac(httppacket);
+        printMac(packetdata);
 
-      printIP(httppacket);
+        if(packetdata->type == 0x800) // IP
+        {
+            printf("IP DETECTED : \n");
 
-      printPort(httppacket);
+            printIP(packetdata);
 
-      printData(httppacket);
+            if(packetdata->protocol == 6) // TCP
+            {
+                printf("TCP DETECTED : \n");
+
+                printPort(packetdata);
+
+                printf("DATA : ");
+                for (int i=0;i<10;i++)
+                {
+                    if( (packetdata->packetTotalLength - (packetdata->ipHeaderLength + packetdata->tcpHeaderLength + 18)) < i)
+                    {
+                        break;
+                    }
+                    printf("%02X ",packetdata->data[i]);
+                }
+                printf("\n");
+            }
+        }
+        else
+        {
+            printf("Other Protocol ....\n");
+        }
     }
     else
     {
-        printf("NO HTTP Packet : \n");
+        printf("HTTP NOT DETECTED : \n");
 
-        printMac(httppacket);
+        printMac(packetdata);
 
-        printIP(httppacket);
+        if(packetdata->type == 0x800) // IP
+        {
+            printf("IP DETECTED : \n");
 
-        printPort(httppacket);
+            printIP(packetdata);
+
+            if(packetdata->protocol == 6) // TCP
+            {
+                printf("TCP DETECTED : \n");
+
+                printPort(packetdata);
+
+                printf("DATA : ");
+                for (int i=0;i<10;i++)
+                {
+                    if( (packetdata->packetTotalLength - (packetdata->ipHeaderLength + packetdata->tcpHeaderLength + 18)) < i)
+                    {
+                        break;
+                    }
+                    printf("%02X ",packetdata->data[i]);
+                }
+                printf("\n");
+            }
+        }
+
+
     }
   }
-
-  pcap_close(handle);
-  return 0;
 }

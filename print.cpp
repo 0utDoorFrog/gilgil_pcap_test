@@ -1,62 +1,134 @@
+#pragma once
+
 #include "print.h"
 
-void httpPacketStructConstructor(httpPacket * httppacket, const u_char * packet)
+/*
+
+struct packetData
 {
-    u_char * mac = (u_char *)&packet[0];
-    u_char * ip = (u_char *)&packet[26];
-    u_char * port = (u_char *)&packet[34];
-    u_char * data = (u_char *)&packet[38];
+    // Ethernet
 
-    httppacket->dMac.mac1 = mac[0];
-    httppacket->dMac.mac2 = mac[1];
-    httppacket->dMac.mac3 = mac[2];
-    httppacket->dMac.mac4 = mac[3];
-    httppacket->dMac.mac5 = mac[4];
-    httppacket->dMac.mac6 = mac[5];
-    httppacket->sMac.mac1 = mac[6];
-    httppacket->sMac.mac2 = mac[7];
-    httppacket->sMac.mac3 = mac[8];
-    httppacket->sMac.mac4 = mac[9];
-    httppacket->sMac.mac5 = mac[10];
-    httppacket->sMac.mac6 = mac[11];
+    uint8_t dMac[5]; // 0
+    uint8_t sMac[5]; // 6
 
-    httppacket->sIP.ip1 = ip[0];
-    httppacket->sIP.ip2 = ip[1];
-    httppacket->sIP.ip3 = ip[2];
-    httppacket->sIP.ip4 = ip[3];
-    httppacket->dIP.ip1 = ip[4];
-    httppacket->dIP.ip2 = ip[5];
-    httppacket->dIP.ip3 = ip[6];
-    httppacket->dIP.ip4 = ip[7];
+    uint16_t type; // 12 // Ethernet Header -> IP Header
 
-    httppacket->sPort = (uint16_t)((port[0] << 8 | port[1]));
-    httppacket->dPort = (uint16_t)((port[2] << 8 | port[3]));
+    // IP
 
-    u_char dataMiddler[10] = {data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9]};
-    memcpy(httppacket->data,dataMiddler,sizeof(dataMiddler));
+    uint8_t headerLength; // 14
+    uint16_t packetTotalLength; //16
+    uint8_t protocol; // 23
+
+    uint8_t sIP[3];             // 26
+    uint8_t dIP[3];             // 30
+
+    // TCP
+
+    uint16_t sPort;             // 34
+    uint16_t dPort;             // 36
+
+    uint8_t data[9];            // 54
+};
+
+*/
+
+void packetDataConstruct(packetData * packetdata,const u_char* packet)
+{
+    for (int i=0;i<6;i++)
+    {
+        packetdata->dMac[i] = packet[i];
+    }
+
+    for (int i=0;i<6;i++)
+    {
+        packetdata->sMac[i] = packet[i+6];
+    }
+
+    packetdata->type=(uint16_t)((packet[12] << 8) | packet[13]);
+
+    packetdata->ipHeaderLength = (uint8_t)(((packet[14]<<4)>>4)*5);
+
+    packetdata->packetTotalLength = (uint16_t)((packet[16] << 8) | packet[17]);
+
+    packetdata->protocol = packet[23];
+
+
+    for (int i=0;i<4;i++)
+    {
+        packetdata->sIP[i] = packet[i+26];
+    }
+
+    for (int i=0;i<4;i++)
+    {
+        packetdata->dIP[i] = packet[i+30];
+    }
+
+    packetdata->sPort = (uint16_t)((packet[34] << 8) | (packet[35]));
+    packetdata->dPort = (uint16_t)((packet[36] << 8) | (packet[37]));
+
+    packetdata->tcpHeaderLength = (uint8_t)((packet[52]>>4)*5);
+
+    for (int i=0;i<10;i++)
+    {
+        if( (packetdata->packetTotalLength - (packetdata->ipHeaderLength + packetdata->tcpHeaderLength + 18)) < i)break;
+        packetdata->data[i] = packet[i];
+    }
+
+
+
+
+
+
 }
 
-void printMac(httpPacket httppacket)
+void printMac(packetData * packetdata)
 {
-    printf("SMAC : %02x:%02x:%02x:%02x:%02x:%02x\n", httppacket.sMac.mac1, httppacket.sMac.mac2, httppacket.sMac.mac3, httppacket.sMac.mac4, httppacket.sMac.mac5, httppacket.sMac.mac6 );
-    printf("DMAC : %02x:%02x:%02x:%02x:%02x:%02x\n", httppacket.dMac.mac1, httppacket.dMac.mac2, httppacket.dMac.mac3, httppacket.dMac.mac4, httppacket.dMac.mac5, httppacket.dMac.mac6 );
+    printf("DMAC : ");
+    for (int i=0;i<6;i++)
+    {
+        printf("%02X:", packetdata->dMac[i]);
+    }
+    printf("\n");
+
+    printf("SMAC : ");
+    for (int i=0;i<6;i++)
+    {
+        printf("%02X:", packetdata->sMac[i]);
+    }
+    printf("\n");
 }
 
-void printIP(httpPacket httppacket)
+void printPort(packetData * packetdata)
 {
-    printf("SIP : %d.%d.%d.%d\n", httppacket.sIP.ip1, httppacket.sIP.ip2, httppacket.sIP.ip3, httppacket.sIP.ip4);
-    printf("DIP : %d.%d.%d.%d\n", httppacket.dIP.ip1, httppacket.dIP.ip2, httppacket.dIP.ip3, httppacket.dIP.ip4);
-
+    printf("DPORT : %d\n", packetdata->dPort);
+    printf("SPORT : %d\n", packetdata->sPort);
 }
 
-void printPort(httpPacket httppacket)
+
+void printIP(packetData * packetdata)
 {
-    printf("SPORT : %d\n", httppacket.sPort);
-    printf("DPORT : %d\n", httppacket.dPort);
+    printf("DIP : ");
+    for (int i=0;i<4;i++)
+    {
+        printf("%d.", packetdata->dIP[i]);
+    }
+    printf("\n");
+
+    printf("SIP : ");
+    for (int i=0;i<4;i++)
+    {
+        printf("%d.", packetdata->dIP[i]);
+    }
+    printf("\n");
 }
 
-void printData(httpPacket httppacket)
+void printData(packetData * packetdata)
 {
-    printf("DATA : %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", httppacket.data[0], httppacket.data[1], httppacket.data[2], httppacket.data[3], httppacket.data[4], httppacket.data[5], httppacket.data[6], httppacket.data[7], httppacket.data[8], httppacket.data[9]);
+    printf("DATA : ");
+    for (int i=0;i<10;i++)
+    {
+      if( (packetdata->packetTotalLength - (packetdata->ipHeaderLength + packetdata->tcpHeaderLength + 18)) < i)break;
+       printf("%02X ",packetdata->data[i]);
+    }
+    printf("\n");
 }
-
