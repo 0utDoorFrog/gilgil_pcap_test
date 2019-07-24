@@ -66,7 +66,7 @@ void packetDataConstruct(packetData * packetdata,const u_char* packet)
     packetdata->sPort = (uint16_t)((packet[34] << 8) | (packet[35]));
     packetdata->dPort = (uint16_t)((packet[36] << 8) | (packet[37]));
 
-    packetdata->tcpHeaderLength = (uint8_t)((packet[52]>>4)*5);
+    packetdata->tcpHeaderLength = (uint8_t)((packet[52]>>4)*4);
 
     for (int i=0;i<10;i++)
     {
