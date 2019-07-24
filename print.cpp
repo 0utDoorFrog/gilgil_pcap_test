@@ -46,7 +46,7 @@ void packetDataConstruct(packetData * packetdata,const u_char* packet)
 
     packetdata->type=(uint16_t)((packet[12] << 8) | packet[13]);
 
-    packetdata->ipHeaderLength = (uint8_t)(((packet[14]<<4)>>4)*5);
+    packetdata->ipHeaderLength = (uint8_t)(((packet[14]<<4)>>4)*4);
 
     packetdata->packetTotalLength = (uint16_t)((packet[16] << 8) | packet[17]);
 
